@@ -54,7 +54,7 @@ if __name__ == "__main__":
     image_size = (320, 240)
     network = Network(dimensions=(320, 240), batch_size=5)
     network.initialize()
-    if os.path.exists(os.path.abspath("network_params.index")):
+    if os.path.exists(os.path.abspath("nnetwork_params.index")):
         network.load("network_params")
     input_batches, target_batches = load_batches(os.path.join("scaled_images", "training"), network, 500)
     input_batches_test, target_batches_test = load_batches(os.path.join("scaled_images", "validation"), network, 20)

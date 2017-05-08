@@ -4,6 +4,7 @@ from __future__ import division, print_function, unicode_literals
 import tensorflow as tf
 import numpy as np
 import os
+from subpixel import PS as phase_shift
 
 
 class Network(object):
@@ -18,27 +19,25 @@ class Network(object):
         scaled_inputs = self.inputs / 256.0
         print("inputs shape: " + str(self.inputs.get_shape()))
 
-        resized = tf.image.resize_bicubic(scaled_inputs,
-                                          [dimensions[1] * self.scale_factor, dimensions[0] * self.scale_factor],
-                                          name="scale_bicubic")
-
         self.layer_params.append({
             'filter_count': 64 * 3,
             'filter_shape': [9, 9]
         })
-        patch_extraction_layer = self.conv_layer("patch_extraction", self.layer_params[-1], resized)
+        patch_extraction_layer = self.conv_layer("patch_extraction", self.layer_params[-1], scaled_inputs)
         self.layer_params.append({
             'filter_count': 32 * 3,
             'filter_shape': [1, 1]
         })
         non_linear_mapping_layer = self.conv_layer("non_linear_mapping_layer", self.layer_params[-1],
                                                    patch_extraction_layer)
+
+        # Phase shift layer
         self.layer_params.append({
-            'filter_count': 3,
+            'filter_count': self.scale_factor * self.scale_factor * 3,
             'filter_shape': [5, 5]
         })
-        self.output = self.conv_layer("reconstruction_layer", self.layer_params[-1],
-                                      non_linear_mapping_layer, linear=True)
+        reconstruction_layer = self.conv_layer("hidden2", self.layer_params[-1], non_linear_mapping_layer)
+        self.output = phase_shift(reconstruction_layer, self.scale_factor, color=True)
 
         if initialize_loss:
             self.real_images = tf.placeholder(tf.float32,
@@ -89,7 +88,14 @@ class Network(object):
                 params['output'] = conv + biases
             params['biases'] = biases
             params['weights'] = weights
-            return params['output']
+        return params['output']
+
+    def highway_layer(self, name, params, layer_data, highway_data):
+        with tf.variable_scope(name):
+            params['mix_weights'] = tf.Variable(tf.constant(1.0, shape=[params['filter_count']]))
+            mix_factor = tf.nn.sigmoid(params['mix_weights'])
+            params['output'] = mix_factor * highway_data + (1 - mix_factor) * layer_data
+        return params['output']
 
     def get_loss(self):
         return tf.reduce_sum(tf.nn.l2_loss(self.output - tf.div(self.real_images, 256.0)))

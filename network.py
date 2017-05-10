@@ -92,7 +92,7 @@ class Network(object):
 
     def highway_layer(self, name, params, layer_data, highway_data):
         with tf.variable_scope(name):
-            params['mix_weights'] = tf.Variable(tf.constant(1.0, shape=[params['filter_count']]))
+            params['mix_weights'] = tf.Variable(tf.constant(2.0, shape=[params['filter_count']]))
             mix_factor = tf.nn.sigmoid(params['mix_weights'])
             params['output'] = mix_factor * highway_data + (1 - mix_factor) * layer_data
         return params['output']
